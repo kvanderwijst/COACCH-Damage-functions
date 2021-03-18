@@ -1,6 +1,8 @@
+import os
 import pandas as pd
+from PyPDF2 import PdfFileMerger, PdfFileReader
 
-from regression import fitfunctions, quantreg
+from regression import fitfunctions, quantreg, plot
 
 # Import data
 folder = "Data 2021-03-07/"
@@ -20,6 +22,11 @@ regions_nonworld = (
 regions = ["World"] + list(regions_nonworld)
 
 
+#########
+# Calculate regression coefficients
+#########
+
+
 def coeffs(data, x_param, fct):
     """
     For each region, calculates the best fit parameter values
@@ -32,13 +39,26 @@ def coeffs(data, x_param, fct):
         output[region] = quantreg.multiplication_factor_quantiles(
             subset[x_param], subset["Value"], fct
         )
-    return pd.DataFrame(output).T
+    return {"values": pd.DataFrame(output).T, "x_param": x_param, "fit_fct": fct}
 
 
-def save(writer, data, x_param, fit_fct, name):
+coeffs_no_slr_quadratic = coeffs(data_no_slr, "T_Delta", fitfunctions.Quadratic)
+coeffs_slr_ad_linear = coeffs(data_slr_ad, "SLR", fitfunctions.Linear)
+coeffs_slr_ad_logistic = coeffs(data_slr_ad, "SLR", fitfunctions.Logistic)
+coeffs_slr_noad_linear = coeffs(data_slr_noad, "SLR", fitfunctions.Linear)
+coeffs_slr_noad_quadratic = coeffs(data_slr_noad, "SLR", fitfunctions.Quadratic)
+
+
+#########
+# Save to Excel file
+#########
+
+
+def save(writer, calculated_coeffs, name):
     "Writes the coefficients to an Excel file"
 
-    calculated_coeffs = coeffs(data, x_param, fit_fct)
+    x_param = calculated_coeffs["x_param"]
+    fit_fct = calculated_coeffs["fit_fct"]
     sheet_name = "{name}-{fctname}".format(name=name, fctname=fit_fct.__name__)
 
     # Put formula on first row
@@ -47,16 +67,48 @@ def save(writer, data, x_param, fit_fct, name):
     formula_df.to_excel(writer, sheet_name=sheet_name, startrow=0, header=False)
 
     # Save coefficients to subsequent rows
-    calculated_coeffs.to_excel(writer, sheet_name=sheet_name, startrow=2)
+    calculated_coeffs["values"].to_excel(writer, sheet_name=sheet_name, startrow=2)
 
 
-# Create output file
 with pd.ExcelWriter("damage_coefficients.xlsx") as writer:
+    save(writer, coeffs_no_slr_quadratic, "NoSLR")
+    save(writer, coeffs_slr_ad_linear, "SLR-Ad")
+    save(writer, coeffs_slr_ad_logistic, "SLR-Ad")
+    save(writer, coeffs_slr_noad_linear, "SLR-NoAd")
+    save(writer, coeffs_slr_noad_quadratic, "SLR-NoAd")
 
-    save(writer, data_no_slr, "T_Delta", fitfunctions.Quadratic, "NoSLR")
-    save(writer, data_no_slr, "T_Delta", fitfunctions.Quadratic, "NoSLR")
-    save(writer, data_slr_ad, "SLR", fitfunctions.Linear, "SLR-Ad")
-    save(writer, data_slr_ad, "SLR", fitfunctions.Logistic, "SLR-Ad")
-    save(writer, data_slr_noad, "SLR", fitfunctions.Linear, "SLR-NoAd")
-    save(writer, data_slr_noad, "SLR", fitfunctions.Quadratic, "SLR-NoAd")
+
+#########
+# Create Plotly figures
+#########
+
+
+def create_combined_plot_pdf(data, all_coeffs, outputname):
+    filenames = []
+    merged_pdf = PdfFileMerger()
+    for i, region in enumerate(regions):
+        filename = f"Output/temp_{i}.pdf"
+        fig = plot.create_combined_plot(data, region, all_coeffs)
+        fig.write_image(filename)
+        filenames.append(filename)
+        merged_pdf.append(PdfFileReader(filename))
+
+    merged_pdf.write(outputname)
+
+    # Delete all temporary files
+    for file in filenames:
+        os.remove(file)
+
+
+create_combined_plot_pdf(
+    data_no_slr, [coeffs_no_slr_quadratic], "TempRelatedDamages.pdf",
+)
+create_combined_plot_pdf(
+    data_slr_ad, [coeffs_slr_ad_linear, coeffs_slr_ad_logistic], "SLRDamages_Ad.pdf",
+)
+create_combined_plot_pdf(
+    data_slr_noad,
+    [coeffs_slr_noad_linear, coeffs_slr_noad_quadratic],
+    "SLRDamages_NoAd.pdf",
+)
 
