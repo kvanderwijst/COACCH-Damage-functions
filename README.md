@@ -14,3 +14,5 @@ All calculations happen in `regression/quantreg.py`. The available fit functions
  
 ## Requirements
 This code uses OLS regression from `scipy.optimize` and quantile regression from `statsmodels`.
+
+For the plotting part, we use the `plotly` package and the `pypdf2` package for combining the PDF files.
