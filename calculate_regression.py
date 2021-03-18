@@ -4,6 +4,8 @@ from PyPDF2 import PdfFileMerger, PdfFileReader
 
 from regression import fitfunctions, quantreg, plot
 
+ROBUST_REGRESSION = True
+
 # Import data
 folder = "Data 2021-03-07/"
 data_no_slr = pd.read_csv(folder + "GDP_damages_IAMs_NoSLR_data.csv")
@@ -21,6 +23,7 @@ regions_nonworld = (
 )
 regions = ["World"] + list(regions_nonworld)
 
+suffix = '_robust' if ROBUST_REGRESSION else '_ols'
 
 #########
 # Calculate regression coefficients
@@ -37,7 +40,7 @@ def coeffs(data, x_param, fct):
     for region in regions:
         subset = data[data["Region"] == region]
         output[region] = quantreg.multiplication_factor_quantiles(
-            subset[x_param], subset["Value"], fct
+            subset[x_param], subset["Value"], fct, ROBUST_REGRESSION
         )
     return {"values": pd.DataFrame(output).T, "x_param": x_param, "fit_fct": fct}
 
@@ -70,7 +73,7 @@ def save(writer, calculated_coeffs, name):
     calculated_coeffs["values"].to_excel(writer, sheet_name=sheet_name, startrow=2)
 
 
-with pd.ExcelWriter("damage_coefficients.xlsx") as writer:
+with pd.ExcelWriter(f"damage_coefficients{suffix}.xlsx") as writer:
     save(writer, coeffs_no_slr_quadratic, "NoSLR")
     save(writer, coeffs_slr_ad_linear, "SLR-Ad")
     save(writer, coeffs_slr_ad_logistic, "SLR-Ad")
@@ -93,7 +96,10 @@ def create_combined_plot_pdf(data, all_coeffs, outputname):
         filenames.append(filename)
         merged_pdf.append(PdfFileReader(filename))
 
-    merged_pdf.write(outputname)
+    try:
+        merged_pdf.write(outputname)
+    except PermissionError:
+        merged_pdf.write(outputname + "_new.pdf")
 
     # Delete all temporary files
     for file in filenames:
@@ -101,14 +107,14 @@ def create_combined_plot_pdf(data, all_coeffs, outputname):
 
 
 create_combined_plot_pdf(
-    data_no_slr, [coeffs_no_slr_quadratic], "TempRelatedDamages.pdf",
+    data_no_slr, [coeffs_no_slr_quadratic], f"TempRelatedDamages{suffix}.pdf",
 )
 create_combined_plot_pdf(
-    data_slr_ad, [coeffs_slr_ad_linear, coeffs_slr_ad_logistic], "SLRDamages_Ad.pdf",
+    data_slr_ad, [coeffs_slr_ad_linear, coeffs_slr_ad_logistic], f"SLRDamages_Ad{suffix}.pdf",
 )
 create_combined_plot_pdf(
     data_slr_noad,
     [coeffs_slr_noad_linear, coeffs_slr_noad_quadratic],
-    "SLRDamages_NoAd.pdf",
+    f"SLRDamages_NoAd{suffix}.pdf",
 )
 
