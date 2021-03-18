@@ -36,7 +36,7 @@ def multiplication_factor_quantiles(
     # Calculate the quantiles for each quantile
     quantiles = [0.025, 0.05, 0.16, 0.5, 0.84, 0.95, 0.975]
     factor_values = {
-        f"a (q={q})": model.fit(q=q, p_tol=1e-10, max_iter=5000).params.values[0]
+        f"a (q={q})": model.fit(q=q, p_tol=1e-12, max_iter=5000).params.values[0]
         for q in quantiles
     }
 
