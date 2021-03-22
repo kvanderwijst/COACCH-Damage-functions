@@ -31,7 +31,9 @@ def multiplication_factor_quantiles(
 
     # Create the quantile regression model
     # (we round the bestfit_values to avoid QuantReg getting stuck in a local optimum)
-    model = QuantReg(yvalues, fit_fct.fct(xvalues, *np.round(bestfit_values, 8)))
+    fit_values = fit_fct.fct(xvalues, *np.round(bestfit_values, 8))
+    ratios = yvalues / fit_values
+    model = QuantReg(yvalues, fit_values)
 
     # Calculate the quantiles for each quantile
     quantiles = [0.025, 0.05, 0.16, 0.5, 0.84, 0.95, 0.975]
@@ -40,4 +42,4 @@ def multiplication_factor_quantiles(
         for q in quantiles
     }
 
-    return {**bestfit_params, **factor_values}
+    return {**bestfit_params, **factor_values}, ratios

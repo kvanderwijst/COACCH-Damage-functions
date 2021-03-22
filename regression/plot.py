@@ -45,28 +45,37 @@ def create_single_plot(
     return fig.update_traces(marker_size=4)
 
 
-def create_combined_plot(data, region, all_coeffs, max_cols=2):
+def create_combined_plot(data, region, all_coeffs, max_cols=2, with_histogram=True):
     regional_data = data[data["Region"] == region]
 
     nrows = int(np.ceil(len(all_coeffs) / max_cols))
     ncols = min(2, len(all_coeffs))
+
+    subplot_titles = []
+    for coeffs in all_coeffs:
+        subplot_titles.extend(
+            [
+                "{} - {}<br><i>a</i> * ( {} )".format(
+                    coeffs["fit_fct"].__name__,
+                    "robust" if coeffs["robust"] else "OLS",
+                    coeffs["fit_fct"].formula.format(x="T_Delta"),
+                ),
+            ]
+            + (["Hist. of <i>a</i>"] if with_histogram else [])
+        )
+
     fig = make_subplots(
         nrows,
-        ncols,
-        shared_yaxes=True,
-        horizontal_spacing=0.02,
-        subplot_titles=[
-            "{} - {}<br>a * ( {} )".format(
-                coeffs["fit_fct"].__name__,
-                "robust" if coeffs["robust"] else "OLS",
-                coeffs["fit_fct"].formula.format(x="T_Delta"),
-            )
-            for coeffs in all_coeffs
-        ],
+        2 * ncols if with_histogram else ncols,
+        horizontal_spacing=0.03,
+        subplot_titles=subplot_titles,
+        column_widths=[3 / (4 * ncols), 1 / (4 * ncols)] * ncols
+        if with_histogram
+        else None,
     )
 
     for i, coeffs in enumerate(all_coeffs):
-        col = i % ncols + 1
+        col = 2 * (i % ncols) + 1 if with_histogram else i % ncols + 1
         row = i // ncols + 1
         subfig = create_single_plot(
             regional_data,
@@ -79,6 +88,17 @@ def create_combined_plot(data, region, all_coeffs, max_cols=2):
                 trace.update(showlegend=i == 0 and trace.showlegend), row=row, col=col
             )
         fig.update_xaxes(title=coeffs["x_param"], col=col, row=row)
+        fig.update_yaxes(ticksuffix="%", matches="y1", row=row, col=col)
+        if with_histogram:
+            # Add histogram
+            fig.add_histogram(
+                x=coeffs["ratios"][region],
+                showlegend=False,
+                marker_color=px.colors.qualitative.Plotly[0],
+                row=row,
+                col=col + 1,
+            )
+            fig.update_xaxes(title="<i>a</i>", col=col + 1, row=row)
 
     # Update layout
     fig.update_layout(
@@ -86,6 +106,6 @@ def create_combined_plot(data, region, all_coeffs, max_cols=2):
         legend_traceorder="reversed",
         title=f"Region: <b>{region}</b>",
         height=100 + 350 * nrows,
-    ).update_yaxes(ticksuffix="%", matches="y1")
+    )
 
     return fig

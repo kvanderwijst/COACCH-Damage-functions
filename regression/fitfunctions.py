@@ -31,6 +31,6 @@ class Quadratic(GeneralFitFunction):
 
 class Logistic(GeneralFitFunction):
     param_names = ["b1", "b2", "b3"]
-    formula = "b1 / (1 + b2 * exp(-b3 * {x})) - b1 / (1 + b2)"
+    formula = "b1/(1+b2*exp(-b3*{x})) - b1/(1+b2)"
     fct = lambda x, b1, b2, b3: b1 / (1 + b2 * np.exp(-b3 * x)) - b1 / (1 + b2)
 

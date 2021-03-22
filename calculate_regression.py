@@ -22,6 +22,8 @@ regions_nonworld = (
 )
 regions = ["World"] + list(regions_nonworld)
 
+WITH_HISTOGRAMS = True
+
 #########
 # Calculate regression coefficients
 #########
@@ -34,13 +36,15 @@ def coeffs(data, x_param, fct, robust_regression=False):
     factors from the quantile regression
     """
     output = {}
+    ratios = {}
     for region in regions:
         subset = data[data["Region"] == region]
-        output[region] = quantreg.multiplication_factor_quantiles(
+        output[region], ratios[region] = quantreg.multiplication_factor_quantiles(
             subset[x_param], subset["Value"], fct, robust_regression
         )
     return {
         "values": pd.DataFrame(output).T,
+        "ratios": ratios,
         "x_param": x_param,
         "fit_fct": fct,
         "robust": robust_regression,
@@ -110,7 +114,9 @@ def create_combined_plot_pdf(data, all_coeffs, outputname):
     merged_pdf = PdfFileMerger()
     for i, region in enumerate(regions):
         filename = f"Output/temp_{i}.pdf"
-        fig = plot.create_combined_plot(data, region, all_coeffs)
+        fig = plot.create_combined_plot(
+            data, region, all_coeffs, with_histogram=WITH_HISTOGRAMS
+        )
         fig.write_image(filename)
         filenames.append(filename)
         merged_pdf.append(PdfFileReader(filename))
@@ -122,7 +128,10 @@ def create_combined_plot_pdf(data, all_coeffs, outputname):
 
     # Delete all temporary files
     for file in filenames:
-        os.remove(file)
+        try:
+            os.remove(file)
+        except PermissionError:
+            pass
 
 
 create_combined_plot_pdf(
