@@ -22,49 +22,50 @@ regions_nonworld = (
 )
 regions = ["World"] + list(regions_nonworld)
 
-WITH_HISTOGRAMS = True
+WITH_HISTOGRAMS = False
 
 #########
 # Calculate regression coefficients
 #########
 
 
-def coeffs(data, x_param, fct, robust_regression=False):
+def coeffs(data, x_param, fct):
     """
     For each region, calculates the best fit parameter values
     corresponding to the fit function, and the multiplicatio
     factors from the quantile regression
     """
-    output = {}
+    output_data = {}
     ratios = {}
     for region in regions:
         subset = data[data["Region"] == region]
-        output[region], ratios[region] = quantreg.multiplication_factor_quantiles(
-            subset[x_param], subset["Value"], fct, robust_regression
+        output_data[region], ratios[region] = quantreg.multiplication_factor_quantiles(
+            subset[x_param], subset["Value"], fct
         )
     return {
-        "values": pd.DataFrame(output).T,
+        "values": pd.DataFrame(output_data).T,
         "ratios": ratios,
         "x_param": x_param,
         "fit_fct": fct,
-        "robust": robust_regression,
     }
 
 
-coeffs_no_slr_quadratic_ols = coeffs(data_no_slr, "T_Delta", fitfunctions.Quadratic)
-coeffs_no_slr_quadratic_robust = coeffs(
-    data_no_slr, "T_Delta", fitfunctions.Quadratic, True
-)
-coeffs_slr_ad_linear_ols = coeffs(data_slr_ad, "SLR", fitfunctions.Linear)
-coeffs_slr_ad_linear_robust = coeffs(data_slr_ad, "SLR", fitfunctions.Linear, True)
-coeffs_slr_ad_logistic_ols = coeffs(data_slr_ad, "SLR", fitfunctions.Logistic)
-coeffs_slr_ad_logistic_robust = coeffs(data_slr_ad, "SLR", fitfunctions.Logistic, True)
-coeffs_slr_noad_linear_ols = coeffs(data_slr_noad, "SLR", fitfunctions.Linear)
-coeffs_slr_noad_linear_robust = coeffs(data_slr_noad, "SLR", fitfunctions.Linear, True)
-coeffs_slr_noad_quadratic_ols = coeffs(data_slr_noad, "SLR", fitfunctions.Quadratic)
-coeffs_slr_noad_quadratic_robust = coeffs(
-    data_slr_noad, "SLR", fitfunctions.Quadratic, True
-)
+coeffs_no_slr = [
+    coeffs(data_no_slr, "T_Delta", fitfunctions.QuadraticOLS),
+    coeffs(data_no_slr, "T_Delta", fitfunctions.QuadraticQuantReg),
+]
+coeffs_slr_ad = [
+    coeffs(data_slr_ad, "SLR", fitfunctions.LinearOLS),
+    coeffs(data_slr_ad, "SLR", fitfunctions.LinearQuantReg),
+    coeffs(data_slr_ad, "SLR", fitfunctions.LogisticOLS),
+    coeffs(data_slr_ad, "SLR", fitfunctions.LogisticRobust),
+]
+coeffs_slr_noad = [
+    coeffs(data_slr_noad, "SLR", fitfunctions.LinearOLS),
+    coeffs(data_slr_noad, "SLR", fitfunctions.LinearQuantReg),
+    coeffs(data_slr_noad, "SLR", fitfunctions.QuadraticOLS),
+    coeffs(data_slr_noad, "SLR", fitfunctions.QuadraticQuantReg),
+]
 
 
 #########
@@ -77,10 +78,7 @@ def save(writer, calculated_coeffs, name):
 
     x_param = calculated_coeffs["x_param"]
     fit_fct = calculated_coeffs["fit_fct"]
-    regression = "Robust" if calculated_coeffs["robust"] else "OLS"
-    sheet_name = "{name}-{regression}-{fctname}".format(
-        name=name, regression=regression, fctname=fit_fct.__name__
-    )
+    sheet_name = "{name}-{fctname}".format(name=name, fctname=fit_fct.__name__)
 
     # Put formula on first row
     fullformula = "a * ( {} )".format(fit_fct.formula.format(x=x_param))
@@ -92,16 +90,12 @@ def save(writer, calculated_coeffs, name):
 
 
 with pd.ExcelWriter("damage_coefficients.xlsx") as writer:
-    save(writer, coeffs_no_slr_quadratic_ols, "NoSLR")
-    save(writer, coeffs_no_slr_quadratic_robust, "NoSLR")
-    save(writer, coeffs_slr_ad_linear_ols, "SLR-Ad")
-    save(writer, coeffs_slr_ad_linear_robust, "SLR-Ad")
-    save(writer, coeffs_slr_ad_logistic_ols, "SLR-Ad")
-    save(writer, coeffs_slr_ad_logistic_robust, "SLR-Ad")
-    save(writer, coeffs_slr_noad_linear_ols, "SLR-NoAd")
-    save(writer, coeffs_slr_noad_linear_robust, "SLR-NoAd")
-    save(writer, coeffs_slr_noad_quadratic_ols, "SLR-NoAd")
-    save(writer, coeffs_slr_noad_quadratic_robust, "SLR-NoAd")
+    for output in coeffs_no_slr:
+        save(writer, output, "NoSLR")
+    for output in coeffs_slr_ad:
+        save(writer, output, "SLR-Ad")
+    for output in coeffs_slr_noad:
+        save(writer, output, "SLR-NoAd")
 
 
 #########
@@ -135,28 +129,12 @@ def create_combined_plot_pdf(data, all_coeffs, outputname):
 
 
 create_combined_plot_pdf(
-    data_no_slr,
-    [coeffs_no_slr_quadratic_ols, coeffs_no_slr_quadratic_robust,],
-    "TempRelatedDamages.pdf",
+    data_no_slr, coeffs_no_slr, "TempRelatedDamages.pdf",
 )
 create_combined_plot_pdf(
-    data_slr_ad,
-    [
-        coeffs_slr_ad_linear_ols,
-        coeffs_slr_ad_logistic_ols,
-        coeffs_slr_ad_linear_robust,
-        coeffs_slr_ad_logistic_robust,
-    ],
-    "SLRDamages_Ad.pdf",
+    data_slr_ad, coeffs_slr_ad, "SLRDamages_Ad.pdf",
 )
 create_combined_plot_pdf(
-    data_slr_noad,
-    [
-        coeffs_slr_noad_linear_ols,
-        coeffs_slr_noad_quadratic_ols,
-        coeffs_slr_noad_linear_robust,
-        coeffs_slr_noad_quadratic_robust,
-    ],
-    "SLRDamages_NoAd.pdf",
+    data_slr_noad, coeffs_slr_noad, "SLRDamages_NoAd.pdf",
 )
 

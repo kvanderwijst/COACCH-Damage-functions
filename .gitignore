@@ -6,3 +6,5 @@ __pycache__
 Output/
 Data*/
 .vscode
+*.docx
+*.pptx

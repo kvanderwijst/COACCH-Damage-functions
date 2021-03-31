@@ -55,9 +55,8 @@ def create_combined_plot(data, region, all_coeffs, max_cols=2, with_histogram=Tr
     for coeffs in all_coeffs:
         subplot_titles.extend(
             [
-                "{} - {}<br><i>a</i> * ( {} )".format(
+                "{}<br><i>a</i> * ( {} )".format(
                     coeffs["fit_fct"].__name__,
-                    "robust" if coeffs["robust"] else "OLS",
                     coeffs["fit_fct"].formula.format(x="T_Delta"),
                 ),
             ]
