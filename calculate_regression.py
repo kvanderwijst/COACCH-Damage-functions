@@ -11,16 +11,27 @@ data_no_slr = pd.read_csv(folder + "GDP_damages_IAMs_NoSLR_data.csv")
 data_slr_ad = pd.read_csv(folder + "GDP_damages_IAMs_SLR-Ad_data.csv")
 data_slr_noad = pd.read_csv(folder + "GDP_damages_IAMs_SLR-NoAd_data.csv")
 
+data_no_slr_ices = pd.read_csv(folder + "ICES_NoSLR_reg_damage_data.csv")
+data_slr_ad_ices = pd.read_csv(folder + "ICES_SLR_Ad-damages.csv")
+data_slr_noad_ices = pd.read_csv(folder + "ICES_SLR_NoAd-damages.csv")
+
 # Filter data
 data_no_slr = data_no_slr[data_no_slr["d_T_Delta"] >= 0.05]
+data_no_slr_ices = data_no_slr_ices[data_no_slr_ices["d_T_Delta"] >= 0.05]
+
 data_slr_ad = data_slr_ad[data_slr_ad["level"] != "High-end"]
 data_slr_noad = data_slr_noad[data_slr_noad["level"] != "High-end"]
+data_slr_ad_ices = data_slr_ad_ices[data_slr_ad_ices["level"] != "High-end"]
+data_slr_noad_ices = data_slr_noad_ices[data_slr_noad_ices["level"] != "High-end"]
+
+print("Finished reading data.")
 
 # Get all the regions
 regions_nonworld = (
     data_no_slr.loc[data_no_slr["Region"] != "World", "Region"].sort_values().unique()
 )
-regions = ["World"] + list(regions_nonworld)
+regions_coacch = ["World"] + list(regions_nonworld)
+regions_ices = list(data_no_slr_ices["Region"].sort_values().unique())
 
 WITH_HISTOGRAMS = False
 
@@ -29,7 +40,7 @@ WITH_HISTOGRAMS = False
 #########
 
 
-def coeffs(data, x_param, fct):
+def coeffs(data, x_param, fct, regions=regions_coacch):
     """
     For each region, calculates the best fit parameter values
     corresponding to the fit function, and the multiplicatio
@@ -67,6 +78,33 @@ coeffs_slr_noad = [
     coeffs(data_slr_noad, "SLR", fitfunctions.QuadraticQuantReg),
 ]
 
+# ICES regions
+coeffs_no_slr_ices = [
+    coeffs(
+        data_no_slr_ices, "reg_tmean_delta", fitfunctions.QuadraticOLS, regions_ices
+    ),
+    coeffs(
+        data_no_slr_ices,
+        "reg_tmean_delta",
+        fitfunctions.QuadraticQuantReg,
+        regions_ices,
+    ),
+]
+coeffs_slr_ad_ices = [
+    coeffs(data_slr_ad_ices, "SLR", fitfunctions.LinearOLS, regions_ices),
+    coeffs(data_slr_ad_ices, "SLR", fitfunctions.LinearQuantReg, regions_ices),
+    coeffs(data_slr_ad_ices, "SLR", fitfunctions.LogisticOLS, regions_ices),
+    coeffs(data_slr_ad_ices, "SLR", fitfunctions.LogisticRobust, regions_ices),
+]
+coeffs_slr_noad_ices = [
+    coeffs(data_slr_noad_ices, "SLR", fitfunctions.LinearOLS, regions_ices),
+    coeffs(data_slr_noad_ices, "SLR", fitfunctions.LinearQuantReg, regions_ices),
+    coeffs(data_slr_noad_ices, "SLR", fitfunctions.QuadraticOLS, regions_ices),
+    coeffs(data_slr_noad_ices, "SLR", fitfunctions.QuadraticQuantReg, regions_ices),
+]
+
+print("Finished calculating coefficients")
+
 
 #########
 # Save to Excel file
@@ -97,13 +135,22 @@ with pd.ExcelWriter("damage_coefficients.xlsx") as writer:
     for output in coeffs_slr_noad:
         save(writer, output, "SLR-NoAd")
 
+with pd.ExcelWriter("damage_coefficients_ices.xlsx") as writer:
+    for output in coeffs_no_slr_ices:
+        save(writer, output, "NoSLR")
+    for output in coeffs_slr_ad_ices:
+        save(writer, output, "SLR-Ad")
+    for output in coeffs_slr_noad_ices:
+        save(writer, output, "SLR-NoAd")
+
+print("Finished saving Excel file")
 
 #########
 # Create Plotly figures
 #########
 
 
-def create_combined_plot_pdf(data, all_coeffs, outputname):
+def create_combined_plot_pdf(data, all_coeffs, outputname, regions=regions_coacch):
     filenames = []
     merged_pdf = PdfFileMerger()
     for i, region in enumerate(regions):
@@ -138,3 +185,15 @@ create_combined_plot_pdf(
     data_slr_noad, coeffs_slr_noad, "SLRDamages_NoAd.pdf",
 )
 
+# ICES regions
+create_combined_plot_pdf(
+    data_no_slr_ices, coeffs_no_slr_ices, "TempRelatedDamages_ices.pdf", regions_ices,
+)
+create_combined_plot_pdf(
+    data_slr_ad_ices, coeffs_slr_ad_ices, "SLRDamages_Ad_ices.pdf", regions=regions_ices
+)
+create_combined_plot_pdf(
+    data_slr_noad_ices, coeffs_slr_noad_ices, "SLRDamages_NoAd_ices.pdf", regions_ices,
+)
+
+print("Finished creating plots")

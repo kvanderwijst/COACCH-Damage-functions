@@ -15,7 +15,9 @@ def create_single_plot(
     regional_data, x_param, fit_fct: GeneralFitFunction, regional_coeffs
 ):
 
-    x = np.linspace(0, 1.05 * regional_data[x_param].max())
+    x = np.linspace(
+        min(0, 1.05 * regional_data[x_param].min()), 1.05 * regional_data[x_param].max()
+    )
     y_best = fit_fct.fct(x, *regional_coeffs[fit_fct.param_names])
 
     # Add markers
@@ -57,7 +59,7 @@ def create_combined_plot(data, region, all_coeffs, max_cols=2, with_histogram=Tr
             [
                 "{}<br><i>a</i> * ( {} )".format(
                     coeffs["fit_fct"].__name__,
-                    coeffs["fit_fct"].formula.format(x="T_Delta"),
+                    coeffs["fit_fct"].formula.format(x=coeffs["x_param"]),
                 ),
             ]
             + (["Hist. of <i>a</i>"] if with_histogram else [])

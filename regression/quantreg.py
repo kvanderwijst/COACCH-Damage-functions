@@ -21,7 +21,7 @@ def multiplication_factor_quantiles(xvalues, yvalues, fit_fct: GeneralFitFunctio
     model = QuantReg(yvalues, fit_values)
 
     # Calculate the quantiles for each quantile
-    quantiles = [0.025, 0.05, 0.16, 0.25, 0.5, 0.75, 0.84, 0.95, 0.975]
+    quantiles = [0.025, 0.05, 0.16, 0.25, 0.33, 0.5, 0.67, 0.75, 0.84, 0.95, 0.975]
     factor_values = {
         f"a (q={q})": model.fit(q=q, p_tol=1e-12, max_iter=5000).params.values[0]
         for q in quantiles
